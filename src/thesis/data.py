@@ -1,17 +1,15 @@
+from pathlib import Path
 from typing import override
 
-from pathlib import Path
 import pandas as pd
-from PIL import Image
-
 import torch
+from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
 from thesis.paths import DATA_DIR
-from thesis.utils.db import load_db
 from thesis.transforms import TRANSFORM_DEFAULT
-
+from thesis.utils.db import load_db
 
 # idx, image, label, path
 ItemType = tuple[int, torch.Tensor, int, str]
