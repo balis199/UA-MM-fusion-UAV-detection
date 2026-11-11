@@ -24,3 +24,6 @@ events.out.*
 /run.sh
 
 # user files
+.venv/
+__pycache__/
+caches

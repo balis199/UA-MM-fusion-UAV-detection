@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
-from thesis.paths import DATA_DIR, OUTPUT_DIR, CONFIG_DIR
+
+from thesis.paths import CONFIG_DIR, DATA_DIR, OUTPUT_DIR
 
 
 @dataclass()

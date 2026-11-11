@@ -1,5 +1,5 @@
 [project]
-name = "ua-mm-fusion-uav-detection"
+name = "thesis"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -26,3 +26,11 @@ ua-mm-fusion-uav-detection = "ua_mm_fusion_uav_detection:main"
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.4",
+]
+
+[tool.ruff]
+line-length = 100
