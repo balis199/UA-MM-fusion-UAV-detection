@@ -7,7 +7,18 @@ authors = [
     { name = "Mark Schuddeboom", email = "schuddeboom@hotmail.nl" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "jupyter>=1.1.1",
+    "matplotlib>=3.11.2",
+    "pandas>=3.1.1",
+    "pathlib>=1.0.1",
+    "scikit-learn>=1.9.1",
+    "tensorboard>=2.21.0",
+    "torch>=2.15.0",
+    "torchaudio>=2.11.1",
+    "torchvision>=0.29.2",
+    "typing>=3.10.0.0",
+]
 
 [project.scripts]
 ua-mm-fusion-uav-detection = "ua_mm_fusion_uav_detection:main"
