@@ -1,7 +1,6 @@
-from tqdm import tqdm
-
 import torch
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from thesis.config import Config
 from thesis.data import ImageClassification
