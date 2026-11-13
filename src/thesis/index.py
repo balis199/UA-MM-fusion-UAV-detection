@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from tqdm import tqdm
 
 import distinctipy
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageDraw
+from tqdm import tqdm
 
 from thesis.config import Config
 from thesis.paths import DATA_DIR
@@ -51,7 +51,10 @@ class ClustersConfig:
     colors: list[tuple[int, int, int]] = field(init=False)
 
     def __post_init__(self):
-        self.colors = [(int(r * 255), int(g * 255), int(b * 255)) for r, g, b in distinctipy.get_colors(self.num_clusters, rng=self.seed)]
+        self.colors = [
+            (int(r * 255), int(g * 255), int(b * 255))
+            for r, g, b in distinctipy.get_colors(self.num_clusters, rng=self.seed)
+        ]
 
 
 def normalize_points(points, w: int, h: int):
@@ -75,14 +78,19 @@ def generate_clusters(cfg: ClustersConfig, exact_num_points: bool = False):
     np.random.seed(cfg.seed)
 
     # Generate number of points per cluster
-    nums = np.random.randint(low=cfg.points_per_cluster_min, high=cfg.points_per_cluster_max, size=cfg.num_clusters)
+    nums = np.random.randint(
+        low=cfg.points_per_cluster_min, high=cfg.points_per_cluster_max, size=cfg.num_clusters
+    )
 
     # Algo to try to get enough points
     if exact_num_points:
-
         # 'Double' the sample for each cluster
         while nums.sum() < cfg.num_points:
-            nums += np.random.randint(low=cfg.points_per_cluster_min, high=cfg.points_per_cluster_max, size=cfg.num_clusters)
+            nums += np.random.randint(
+                low=cfg.points_per_cluster_min,
+                high=cfg.points_per_cluster_max,
+                size=cfg.num_clusters,
+            )
 
         # Remove one sample from beginning till we reach desired num_points
         for i in range(nums.sum() - cfg.num_points):
@@ -95,8 +103,13 @@ def generate_clusters(cfg: ClustersConfig, exact_num_points: bool = False):
         points_ = np.empty((nums[i], cfg.num_dims), dtype=np.float32)
         labels_ = np.ones((nums[i],), dtype=int) * i
         for j in range(cfg.num_dims):
-            mean = np.random.rand() * (cfg.cluster_mean_max - cfg.cluster_mean_min) + cfg.cluster_mean_min
-            std = np.random.rand() * (cfg.cluster_std_max - cfg.cluster_std_min) + cfg.cluster_std_min
+            mean = (
+                np.random.rand() * (cfg.cluster_mean_max - cfg.cluster_mean_min)
+                + cfg.cluster_mean_min
+            )
+            std = (
+                np.random.rand() * (cfg.cluster_std_max - cfg.cluster_std_min) + cfg.cluster_std_min
+            )
             points_[:, j] = np.random.normal(mean, std, nums[i])
         points.append(points_)
         labels.append(labels_)
@@ -140,7 +153,9 @@ def index_boxes_dataset(cfg: Config):
         image = Image.new("RGB", (w, h), color="black")
         draw = ImageDraw.Draw(image)
         for _, ((x, y), l) in enumerate(zip(points, labels)):
-            draw.rectangle((x - bw / 2, y - bh / 2, x + bw / 2, y + bh / 2), fill=clusters_cfg.colors[l])
+            draw.rectangle(
+                (x - bw / 2, y - bh / 2, x + bw / 2, y + bh / 2), fill=clusters_cfg.colors[l]
+            )
 
         # Save image
         path = (boxes_cfg.root_dir / f"{i:05d}.jpg").relative_to(boxes_cfg.data_dir)

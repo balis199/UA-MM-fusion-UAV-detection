@@ -1,0 +1,12 @@
+{
+    "debug": false,
+    "data_dir": "data/Anti-UAV-RGBT",
+    "output_dir": "outputs",
+    "data_name": "visible",
+    "data_split": "train",
+    "data_frac": 1.0,
+    "data_seed": 7,
+    "data_batch_size": 32,
+    "model_name": "yolov5s",
+    "model_yolo_pretrained": true
+}

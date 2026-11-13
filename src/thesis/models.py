@@ -1,11 +1,11 @@
 import torch
+
 from thesis.config import Config
 
 
 def load_model(cfg: Config, device: torch.device, train: bool) -> torch.nn.Module:
 
     if "yolo" in cfg.model_name:
-
         model = torch.hub.load(
             "ultralytics/yolov5",
             cfg.model_name,
@@ -13,7 +13,6 @@ def load_model(cfg: Config, device: torch.device, train: bool) -> torch.nn.Modul
         )
 
     elif "unet" in cfg.model_name:
-
         model = torch.hub.load(
             "mateuszbuda/brain-segmentation-pytorch",
             cfg.model_name,
@@ -24,7 +23,6 @@ def load_model(cfg: Config, device: torch.device, train: bool) -> torch.nn.Modul
         )
 
     else:
-
         raise KeyError(f"Invalid model_name: {cfg.model_name}")
 
     assert isinstance(model, torch.nn.Module)

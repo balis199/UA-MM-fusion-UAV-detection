@@ -1,7 +1,8 @@
 from typing import Any
+
 import torch
-from torchvision.transforms import v2
 from torchvision.ops import nms
+from torchvision.transforms import v2
 from torchvision.transforms.v2 import Transform
 
 TRANSFORM_DEFAULT = v2.Compose(
@@ -68,7 +69,9 @@ class NMSYoloBoxes(Transform):
             selected = nms(boxes, scores, iou_threshold=self.iou_threshold)
 
             # Append sample idx
-            features = torch.hstack([features[selected], torch.ones_like(selected).unsqueeze(1) * idx])
+            features = torch.hstack(
+                [features[selected], torch.ones_like(selected).unsqueeze(1) * idx]
+            )
 
             # Accumulate
             filtered.append(features)
