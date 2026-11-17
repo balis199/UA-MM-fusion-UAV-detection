@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from thesis.paths import ANTI_UAV_DATA_DIR
-from thesis.preprocess import Preprocess
+from thesis.preprocess_antiuav import Preprocess
 
 
 def main() -> None:
