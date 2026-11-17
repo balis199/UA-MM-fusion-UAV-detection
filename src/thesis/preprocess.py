@@ -14,11 +14,13 @@ with one video or image folder per modality) and cuts up every sequence.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from itertools import groupby
 from pathlib import Path
 from typing import ClassVar
 
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
@@ -41,11 +43,16 @@ class Frame:
         resized = cv2.resize(self.image, size, interpolation=cv2.INTER_AREA)
         return replace(self, image=resized)
 
+    @staticmethod
+    def filename(sequence_id: str, modality: str, frame_id: int) -> str:
+        """Self-describing filename for a saved frame."""
+        return f"{sequence_id}_{modality}_frame_{frame_id:06d}.png"
+
     def save(self, out_dir: str | Path) -> Path:
         """Save the frame under ``out_dir`` with a self-describing filename."""
         out = Path(out_dir)
         out.mkdir(parents=True, exist_ok=True)
-        path = out / f"{self.sequence_id}_{self.modality}_frame_{self.frame_id:06d}.png"
+        path = out / self.filename(self.sequence_id, self.modality, self.frame_id)
         if not cv2.imwrite(str(path), self.image):
             raise OSError(f"Could not save frame to {path}")
         return path
@@ -135,7 +142,8 @@ class Sequence:
         """Time-shifted window of frames at indices ``start+shift .. start+shift+length-1``."""
         if length < 1:
             raise ValueError("length must be positive")
-        return [self.frame(modality, start + shift + offset) for offset in range(length)]
+        offsets = tqdm(range(length), desc=f"{self.sequence_id}/{modality} window", unit="frame")
+        return [self.frame(modality, start + shift + offset) for offset in offsets]
 
     def cutup(
         self,
@@ -150,7 +158,46 @@ class Sequence:
             raise ValueError("step must be positive")
         count = self.frame_count(modality)
         frame_ids = range(start + shift, count, step)
-        return [self.frame(modality, frame_id).save(out_dir) for frame_id in frame_ids]
+        print(
+            f"{self.sequence_id}/{modality}: cutting up {len(frame_ids)} frames "
+            f"(start={start}, step={step}, shift={shift})"
+        )
+        frames = tqdm(
+            frame_ids, total=len(frame_ids), desc=f"{self.sequence_id}/{modality}", unit="frame"
+        )
+        saved: list[Path] = []
+        for frame_id in frames:
+            saved.append(self.frame(modality, frame_id).save(out_dir))
+        print(f"{self.sequence_id}/{modality}: saved {len(saved)} frames to {out_dir}")
+        return saved
+
+    def expected_paths(
+        self,
+        modality: str,
+        out_dir: str | Path,
+        start: int = 0,
+        step: int = 1,
+        shift: int = 0,
+    ) -> list[Path]:
+        """Paths :meth:`cutup` would write for these parameters, without writing them."""
+        count = self.frame_count(modality)
+        out = Path(out_dir)
+        return [
+            out / Frame.filename(self.sequence_id, modality, frame_id)
+            for frame_id in range(start + shift, count, step)
+        ]
+
+    def is_processed(
+        self,
+        modality: str,
+        out_dir: str | Path,
+        start: int = 0,
+        step: int = 1,
+        shift: int = 0,
+    ) -> bool:
+        """True if every frame :meth:`cutup` would write already exists in ``out_dir``."""
+        expected = self.expected_paths(modality, out_dir, start=start, step=step, shift=shift)
+        return bool(expected) and all(path.exists() for path in expected)
 
 
 class Preprocess:
@@ -171,8 +218,11 @@ class Preprocess:
         for name in splits:
             split_dir = self.dataset_root / name
             if not split_dir.is_dir():
+                print(f"Split {name!r} not found under {self.dataset_root}, skipping")
                 continue
-            found.extend(Sequence(path) for path in sorted(split_dir.iterdir()) if path.is_dir())
+            sequences = [Sequence(p) for p in sorted(split_dir.iterdir()) if p.is_dir()]
+            print(f"Split {name!r}: found {len(sequences)} sequences in {split_dir}")
+            found.extend(sequences)
         return found
 
     def process(
@@ -180,15 +230,52 @@ class Preprocess:
         modalities: tuple[str, ...] = ("visible", "infrared"),
         step: int = 1,
         shift: int = 0,
+        skip_existing: bool = True,
     ) -> list[Path]:
-        """Cut up every sequence of every split into ``<output_dir>/<split>/<sequence>/<modality>/``."""
+        """Cut up every sequence of every split into ``<output_dir>/<split>/<sequence>/<modality>/``.
+
+        With ``skip_existing`` (the default), pairs whose expected frame files already
+        exist in the output are skipped (reported per sequence), so interrupted runs resume.
+        """
+        tasks = [
+            (split, sequence, modality)
+            for split in self.SPLITS
+            for sequence in self.sequences(split)
+            for modality in modalities
+        ]
+        print(
+            f"Cutting up {len(tasks)} sequence/modality pairs "
+            f"(step={step}, shift={shift}) into {self.output_dir}"
+        )
         saved: list[Path] = []
-        for split in self.SPLITS:
-            for sequence in self.sequences(split):
-                for modality in modalities:
+        skipped = 0
+        with tqdm(total=len(tasks), desc="Processing", unit="pair") as pbar:
+            for (split, sequence), group in groupby(tasks, key=lambda task: (task[0], task[1])):
+                done: list[str] = []
+                missing: list[str] = []
+                for _, _, modality in group:
+                    pbar.set_description(f"{split}/{sequence.sequence_id}/{modality}")
+                    pbar.update(1)
                     out_dir = self.output_dir / split / sequence.sequence_id / modality
                     try:
+                        if skip_existing and sequence.is_processed(
+                            modality, out_dir, step=step, shift=shift
+                        ):
+                            skipped += 1
+                            done.append(modality)
+                            continue
                         saved.extend(sequence.cutup(modality, out_dir, step=step, shift=shift))
                     except FileNotFoundError:
-                        continue  # modality missing for this sequence
+                        missing.append(modality)
+                if done or missing:
+                    reasons = []
+                    if done:
+                        reasons.append(f"already processed: {', '.join(done)}")
+                    if missing:
+                        reasons.append(f"no source: {', '.join(missing)}")
+                    print(f"Skipping {split}/{sequence.sequence_id} ({'; '.join(reasons)})")
+        if skip_existing:
+            print(f"Saved {len(saved)} frames into {self.output_dir} ({skipped} already processed)")
+        else:
+            print(f"Saved {len(saved)} frames into {self.output_dir}")
         return saved
