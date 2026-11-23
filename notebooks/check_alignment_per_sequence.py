@@ -17,7 +17,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import functools
     import io
@@ -38,7 +38,6 @@ def _():
     # test sequences without leakage is an open assumption (a test sequence has no
     # labels to calibrate on), to be figured out later
     seq_names = sorted(d.name for d in (dataset_path / "train").iterdir() if d.is_dir())
-
     return (
         LinearRegression,
         Path,
@@ -81,7 +80,7 @@ def _(mo, seq_names):
         value="ransac",
         label="outlier method for the per-sequence fit (bin-weighted line, one fit per sequence)",
     )
-    return (outlier_select, seq_select)
+    return outlier_select, seq_select
 
 
 @app.cell
@@ -115,7 +114,7 @@ def _(mo):
 
 
 @app.cell
-def _(Path, cv2, dataset_path, json, mo, re, seq):
+def _(cv2, dataset_path, json, mo, re, seq):
     # cached access to the preprocessed frames (processed/train/<seq>/<modality>/...png)
     pdir = dataset_path / "processed" / seq.parent.name / seq.name
     if not pdir.is_dir():
@@ -123,12 +122,11 @@ def _(Path, cv2, dataset_path, json, mo, re, seq):
 
     frame_re = re.compile(r"_frame_(\d+)\.png$")
     frame_ids = sorted(
-        int(m.group(1))
-        for p in (pdir / "visible").glob("*.png")
-        if (m := frame_re.search(p.name))
+        int(m.group(1)) for p in (pdir / "visible").glob("*.png") if (m := frame_re.search(p.name))
     )
 
     _cache: dict[int, tuple] = {}
+
 
     def get_frames(frame_id: int):
         if frame_id not in _cache:
@@ -139,6 +137,7 @@ def _(Path, cv2, dataset_path, json, mo, re, seq):
             _cache[frame_id] = (rgb, ir)
         return _cache[frame_id]
 
+
     gt_rgb = json.loads((seq / "visible.json").read_text())
     gt_ir = json.loads((seq / "infrared.json").read_text())
 
@@ -146,7 +145,7 @@ def _(Path, cv2, dataset_path, json, mo, re, seq):
         f"sequence **{seq.name}** (train): {len(frame_ids)} preprocessed frames "
         f"(ids {frame_ids[0]}..{frame_ids[-1]}, step {frame_ids[1] - frame_ids[0]}), served from a cache"
     )
-    return (frame_ids, get_frames, gt_ir, gt_rgb)
+    return frame_ids, get_frames, gt_ir, gt_rgb
 
 
 @app.cell
@@ -180,6 +179,7 @@ def _(LinearRegression, Path, dataset_path, json, mo, np):
         n = min(len(out[0]), len(out[1]))
         return out[0][:n], out[1][:n]
 
+
     rgb_centers, ir_centers = [], []
     for seq_dir in sorted((dataset_path / "train").iterdir()):
         if not seq_dir.is_dir():
@@ -211,7 +211,7 @@ def _(LinearRegression, Path, dataset_path, json, mo, np):
         f"**scale** = ({scale_x:.4f}, {scale_y:.4f}), **offset** = ({offset_x:.2f}, {offset_y:.2f}), "
         f"**a_global** = {a_global:.6f}"
     )
-    return (a_global, offset_x, offset_y, reg_x, reg_y, scale_x, scale_y)
+    return a_global, offset_x, offset_y, reg_x, reg_y, scale_x, scale_y
 
 
 @app.cell
@@ -231,7 +231,17 @@ def _(mo):
 
 
 @app.cell
-def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_select, seq):
+def _(
+    LinearRegression,
+    RANSACRegressor,
+    frame_ids,
+    gt_ir,
+    gt_rgb,
+    mo,
+    np,
+    outlier_select,
+    seq,
+):
     # PER-SEQUENCE fit: ONE line per axis per sequence (no subfits), bin-weighted so the
     # dense center cluster cannot skew it, with a selectable outlier method:
     #   "none"  : bin-weighted OLS only
@@ -244,6 +254,7 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
     # drives the overlays / residuals / match slider.
     _N_BINS = 20
 
+
     def _centers(gt):
         out = []
         for r, e in zip(gt["gt_rect"], gt["exist"]):
@@ -251,10 +262,12 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
                 out.append((r[0] + r[2] / 2, r[1] + r[3] / 2))
         return np.array(out, dtype=float).reshape(-1, 2)
 
+
     _c_rgb = _centers(gt_rgb)
     _c_ir = _centers(gt_ir)
     n = min(len(_c_rgb), len(_c_ir))
     _c_rgb, _c_ir = _c_rgb[:n], _c_ir[:n]
+
 
     def _bin_weights(x):
         edges = np.linspace(x.min(), x.max(), _N_BINS + 1)
@@ -262,6 +275,7 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
         cnt = np.bincount(idx, minlength=_N_BINS).astype(float)
         w = 1.0 / np.maximum(cnt[idx], 1.0)
         return w / w.mean()
+
 
     def _fit_axis(x, y, method):
         w = _bin_weights(x)
@@ -273,9 +287,13 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
             beta0 = np.linalg.lstsq(X * w[:, None], y * w, rcond=None)[0]
             r0 = y - X @ beta0
             thr = max(3.0 * 1.4826 * np.median(np.abs(r0 - np.median(r0))), 10.0)
-            reg = RANSACRegressor(LinearRegression(), residual_threshold=thr, max_trials=200, random_state=0)
+            reg = RANSACRegressor(
+                LinearRegression(), residual_threshold=thr, max_trials=200, random_state=0
+            )
             reg.fit(x[:, None], y, sample_weight=w)
-            return np.array([float(reg.estimator_.coef_[0]), float(reg.estimator_.intercept_)]), reg.inlier_mask_
+            return np.array(
+                [float(reg.estimator_.coef_[0]), float(reg.estimator_.intercept_)]
+            ), reg.inlier_mask_
         beta = np.linalg.lstsq(X * w[:, None], y * w, rcond=None)[0]
         keep = np.ones(len(x), bool)
         if method == "mad":
@@ -286,6 +304,7 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
                 keep = np.abs(r - med) <= 3.0 * max(mad, 1e-9)
                 beta = np.linalg.lstsq(X[keep] * w[keep, None], y[keep] * w[keep], rcond=None)[0]
         return beta, keep
+
 
     _img_c = np.array([1920.0, 1080.0]) / 2
     seq_fits = {}
@@ -299,7 +318,11 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
         _keep = _kx & _ky
         _ok = (_rp > 20) & _keep
         _a = (
-            float(np.linalg.lstsq(_rp[_ok, None], _ra[_ok] / np.maximum(_rp[_ok], 1e-9) - 1, rcond=None)[0][0])
+            float(
+                np.linalg.lstsq(_rp[_ok, None], _ra[_ok] / np.maximum(_rp[_ok], 1e-9) - 1, rcond=None)[
+                    0
+                ][0]
+            )
             if _ok.sum() >= 5
             else 0.0
         )
@@ -311,12 +334,15 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
     _bx, _by = seq_fits[_sel]["bx"], seq_fits[_sel]["by"]
     _ids = set(frame_ids)
     frame_err = np.full(len(gt_rgb["gt_rect"]), np.inf)
-    for _i, (_rv, _ri, _ev, _ei) in enumerate(zip(gt_rgb["gt_rect"], gt_ir["gt_rect"], gt_rgb["exist"], gt_ir["exist"])):
+    for _i, (_rv, _ri, _ev, _ei) in enumerate(
+        zip(gt_rgb["gt_rect"], gt_ir["gt_rect"], gt_rgb["exist"], gt_ir["exist"])
+    ):
         if _i in _ids and _ev == 1 and _ei == 1 and len(_rv) == 4 and len(_ri) == 4:
             cx_i = _bx[0] * (_ri[0] + _ri[2] / 2) + _bx[1]
             cy_i = _by[0] * (_ri[1] + _ri[3] / 2) + _by[1]
             frame_err[_i] = float(np.hypot(cx_i - (_rv[0] + _rv[2] / 2), cy_i - (_rv[1] + _rv[3] / 2)))
     valid_err = frame_err[np.isfinite(frame_err)]
+
 
     def bucket_frames(p: int) -> np.ndarray:
         # frames whose selected-method error lies in the +-5 percentile window around p
@@ -326,6 +352,7 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
         if len(bucket) == 0:
             bucket = np.array([int(np.argmin(np.abs(frame_err - np.quantile(valid_err, p / 100))))])
         return bucket
+
 
     _lines = "<br>".join(
         f"**{_m}**: scale=({seq_fits[_m]['bx'][0]:.4f}, {seq_fits[_m]['by'][0]:.4f}), "
@@ -337,7 +364,7 @@ def _(LinearRegression, RANSACRegressor, frame_ids, gt_ir, gt_rgb, np, outlier_s
         f"per-sequence fit on **{seq.name}** ({n} gt boxes), N_BINS={_N_BINS} bin-weighted, "
         f"one line per axis (no subfits), selected outlier method = **{_sel}**<br>{_lines}"
     )
-    return (bucket_frames, frame_err, seq_fits)
+    return bucket_frames, seq_fits
 
 
 @app.cell
@@ -396,6 +423,7 @@ def _(
     _H, _W = _rgb0.shape[:2]
     _img_c0 = np.array([_W / 2, _H / 2])
 
+
     def _centers_of(gt):
         _out = np.full((len(gt["gt_rect"]), 2), np.nan)
         for _i, (_r, _e) in enumerate(zip(gt["gt_rect"], gt["exist"])):
@@ -403,8 +431,10 @@ def _(
                 _out[_i] = (_r[0] + _r[2] / 2, _r[1] + _r[3] / 2)
         return _out
 
+
     _cur_rgb = _centers_of(gt_rgb)
     _cur_ir = _centers_of(gt_ir)
+
 
     def _fwd(p, variant):
         # forward map ir coords -> rgb coords for a variant (selected outlier method)
@@ -415,8 +445,10 @@ def _(
             q = _img_c0 + d * (1.0 + _a_seq * r)[:, None]
         return q
 
+
     _mask_c = np.isfinite(_cur_ir).all(axis=1)
     _pred_cur = {v: _fwd(_cur_ir[_mask_c], v) for v in _variants}
+
 
     @functools.lru_cache(maxsize=8)
     def _radial_maps():
@@ -431,6 +463,7 @@ def _(
         map_x = (_img_c0[0] + (xs - _img_c0[0]) * scale).astype(np.float32)
         map_y = (_img_c0[1] + (ys - _img_c0[1]) * scale).astype(np.float32)
         return map_x, map_y
+
 
     @functools.lru_cache(maxsize=256)
     def overlay_png(frame: int, bbox: bool, alpha: float, variant: str) -> bytes:
@@ -450,7 +483,9 @@ def _(
         if bbox and np.isfinite(_cur_ir[frame]).all() and np.isfinite(_cur_rgb[frame]).all():
             rv = gt_rgb["gt_rect"][frame]
             ax.add_patch(
-                plt.Rectangle((rv[0], rv[1]), rv[2], rv[3], fill=False, edgecolor="lime", lw=2, label="rgb gt")
+                plt.Rectangle(
+                    (rv[0], rv[1]), rv[2], rv[3], fill=False, edgecolor="lime", lw=2, label="rgb gt"
+                )
             )
             ri = gt_ir["gt_rect"][frame]
             corners = np.array(
@@ -479,6 +514,7 @@ def _(
         plt.close(fig)
         return buf.getvalue()
 
+
     @functools.lru_cache(maxsize=128)
     def fit_png(frame: int, variant: str) -> bytes:
         # fit plot per variant: the current sequence's own (ir -> rgb) gt centers per
@@ -487,20 +523,44 @@ def _(
         # methods' lines, dashed gray = global plain-OLS reference
         fig, axes = plt.subplots(1, 2, figsize=(10, 4), dpi=80)
         for ax2, i, name, reg_g in zip(axes, [0, 1], ["x", "y"], [reg_x, reg_y]):
-            ax2.scatter(_cur_ir[_mask_c, i], _cur_rgb[_mask_c, i], s=10, color="black", label=f"sequence ({seq.name})")
+            ax2.scatter(
+                _cur_ir[_mask_c, i],
+                _cur_rgb[_mask_c, i],
+                s=10,
+                color="black",
+                label=f"sequence ({seq.name})",
+            )
             if np.isfinite(_cur_ir[frame, i]):
                 ax2.scatter(
-                    [_cur_ir[frame, i]], [_cur_rgb[frame, i]], marker="*", s=150, color="magenta",
-                    zorder=5, label=f"frame {frame}",
+                    [_cur_ir[frame, i]],
+                    [_cur_rgb[frame, i]],
+                    marker="*",
+                    s=150,
+                    color="magenta",
+                    zorder=5,
+                    label=f"frame {frame}",
                 )
             ir_axis = np.linspace(_cur_ir[_mask_c, i].min(), _cur_ir[_mask_c, i].max(), 100)
             if variant == "seq-reg":
                 for _m, (_rx, _ry) in _regs.items():
                     _reg = (_rx, _ry)[i]
                     if _m == _sel:
-                        ax2.plot(ir_axis, _reg.predict(ir_axis[:, None]), color="red", lw=2, label=f"per-seq [{_sel}]")
+                        ax2.plot(
+                            ir_axis,
+                            _reg.predict(ir_axis[:, None]),
+                            color="red",
+                            lw=2,
+                            label=f"per-seq [{_sel}]",
+                        )
                     else:
-                        ax2.plot(ir_axis, _reg.predict(ir_axis[:, None]), ls=":", lw=1, alpha=0.8, label=f"per-seq [{_m}]")
+                        ax2.plot(
+                            ir_axis,
+                            _reg.predict(ir_axis[:, None]),
+                            ls=":",
+                            lw=1,
+                            alpha=0.8,
+                            label=f"per-seq [{_m}]",
+                        )
             else:
                 pred = _pred_cur[variant]
                 nb = 60
@@ -510,9 +570,18 @@ def _(
                 bx = np.bincount(idx, weights=_cur_ir[_mask_c, i], minlength=nb)
                 bp = np.bincount(idx, weights=pred[:, i], minlength=nb)
                 ok = cnt > 0
-                ax2.plot(bx[ok] / cnt[ok], bp[ok] / cnt[ok], color="red", label=f"per-seq reg+radial [{_sel}]")
+                ax2.plot(
+                    bx[ok] / cnt[ok],
+                    bp[ok] / cnt[ok],
+                    color="red",
+                    label=f"per-seq reg+radial [{_sel}]",
+                )
             ax2.plot(
-                ir_axis, reg_g.predict(ir_axis[:, None]), color="gray", ls="--", label="global (all train, plain OLS)"
+                ir_axis,
+                reg_g.predict(ir_axis[:, None]),
+                color="gray",
+                ls="--",
+                label="global (all train, plain OLS)",
             )
             ax2.set_xlabel(f"ir {name} center")
             ax2.set_ylabel(f"rgb {name} center")
@@ -522,6 +591,7 @@ def _(
         fig.savefig(buf, format="png")
         plt.close(fig)
         return buf.getvalue()
+
 
     @functools.lru_cache(maxsize=128)
     def vectors_png(frame: int, variant: str) -> bytes:
@@ -552,7 +622,15 @@ def _(
         fig, axes = plt.subplots(1, 2, figsize=(10, 4.5), dpi=80)
         axes[0].scatter(res[:, 0], res[:, 1], s=4, alpha=0.5, label="ir center - rgb box center")
         if cur is not None:
-            axes[0].scatter([res[cur, 0]], [res[cur, 1]], marker="*", s=150, color="magenta", zorder=5, label=f"frame {frame}")
+            axes[0].scatter(
+                [res[cur, 0]],
+                [res[cur, 1]],
+                marker="*",
+                s=150,
+                color="magenta",
+                zorder=5,
+                label=f"frame {frame}",
+            )
         axes[0].axhline(0, color="k", lw=0.5)
         axes[0].axvline(0, color="k", lw=0.5)
         axes[0].set_xlabel("dx (px), origin = rgb box center")
@@ -563,7 +641,15 @@ def _(
 
         axes[1].scatter(l_radius, l_res, s=4, alpha=0.5)
         if cur is not None:
-            axes[1].scatter([l_radius[cur]], [l_res[cur]], marker="*", s=150, color="magenta", zorder=5, label=f"frame {frame}")
+            axes[1].scatter(
+                [l_radius[cur]],
+                [l_res[cur]],
+                marker="*",
+                s=150,
+                color="magenta",
+                zorder=5,
+                label=f"frame {frame}",
+            )
         axes[1].set_xlabel("|rgb image center -> rgb box center| (px)")
         axes[1].set_ylabel("|rgb box center -> ir center (mapped)| (px)")
         axes[1].legend(fontsize=8)
@@ -578,7 +664,7 @@ def _(
         plt.close(fig)
         return buf.getvalue()
 
-    return (fit_png, overlay_png, vectors_png)
+    return fit_png, overlay_png, vectors_png
 
 
 @app.cell
@@ -601,10 +687,12 @@ def _(bucket_frames, frame_ids, mo, np):
     frame_state, set_frame = mo.state(frame_ids[0])
     _step = frame_ids[1] - frame_ids[0] if len(frame_ids) > 1 else 1
 
+
     def pick_random_duo(p):
         # match slider moved: jump to a random frame in that error bucket
         rng = np.random.default_rng(int(p))
         set_frame(int(rng.choice(bucket_frames(int(p)))))
+
 
     frame_slider = mo.ui.slider(
         frame_ids[0],
@@ -632,7 +720,7 @@ def _(bucket_frames, frame_ids, mo, np):
         debounce=True,  # update only on release: opacity changes must not re-render per tick
         label="rgb opacity (ir opacity = 1 - rgb)",
     )
-    return (bbox_box, frame_slider, frame_state, match_slider, opacity)
+    return bbox_box, frame_slider, frame_state, match_slider, opacity
 
 
 @app.cell
@@ -647,7 +735,17 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(bbox_box, frame_slider, frame_state, match_slider, mo, opacity, outlier_select, overlay_png, seq_select):
+def _(
+    bbox_box,
+    frame_slider,
+    frame_state,
+    match_slider,
+    mo,
+    opacity,
+    outlier_select,
+    overlay_png,
+    seq_select,
+):
     # cell 1: controls on top, then the video overlays below each other
     _frame = int(frame_state())
     _bbox = bool(bbox_box.value)
@@ -660,6 +758,7 @@ def _(bbox_box, frame_slider, frame_state, match_slider, mo, opacity, outlier_se
             mo.image(overlay_png(_frame, _bbox, _alpha, "seq-radial"), width="100%"),
         ]
     )
+    return
 
 
 @app.cell
@@ -679,6 +778,7 @@ def _(fit_png, frame_state, mo):
     # cell 2: fit plots, one per variant, below each other
     _frame = int(frame_state())
     mo.vstack([mo.image(fit_png(_frame, v), width="100%") for v in ("seq-reg", "seq-radial")])
+    return
 
 
 @app.cell
@@ -697,6 +797,7 @@ def _(frame_state, mo, vectors_png):
     # cell 3: residual plots, one per variant, below each other
     _frame = int(frame_state())
     mo.vstack([mo.image(vectors_png(_frame, v), width="100%") for v in ("seq-reg", "seq-radial")])
+    return
 
 
 @app.cell
@@ -739,12 +840,14 @@ def _(
     )
     _N_BINS = 20
 
+
     def _bin_weights(x):
         edges = np.linspace(x.min(), x.max(), _N_BINS + 1)
         idx = np.clip(np.digitize(x, edges) - 1, 0, _N_BINS - 1)
         cnt = np.bincount(idx, minlength=_N_BINS).astype(float)
         w = 1.0 / np.maximum(cnt[idx], 1.0)
         return w / w.mean()
+
 
     def _fit_axis(x, y, method):
         w = _bin_weights(x)
@@ -756,9 +859,13 @@ def _(
             beta0 = np.linalg.lstsq(X * w[:, None], y * w, rcond=None)[0]
             r0 = y - X @ beta0
             thr = max(3.0 * 1.4826 * np.median(np.abs(r0 - np.median(r0))), 10.0)
-            reg = RANSACRegressor(LinearRegression(), residual_threshold=thr, max_trials=200, random_state=0)
+            reg = RANSACRegressor(
+                LinearRegression(), residual_threshold=thr, max_trials=200, random_state=0
+            )
             reg.fit(x[:, None], y, sample_weight=w)
-            return np.array([float(reg.estimator_.coef_[0]), float(reg.estimator_.intercept_)]), reg.inlier_mask_
+            return np.array(
+                [float(reg.estimator_.coef_[0]), float(reg.estimator_.intercept_)]
+            ), reg.inlier_mask_
         beta = np.linalg.lstsq(X * w[:, None], y * w, rcond=None)[0]
         keep = np.ones(len(x), bool)
         if method == "mad":
@@ -770,6 +877,7 @@ def _(
                 beta = np.linalg.lstsq(X[keep] * w[keep, None], y[keep] * w[keep], rcond=None)[0]
         return beta, keep
 
+
     def _fwd(p, base, av):
         q = (base @ np.vstack([p.T, np.ones(len(p))]))[:2].T
         if av is not None:
@@ -777,6 +885,7 @@ def _(
             r = np.linalg.norm(d, axis=1)
             q = _img_c + d * (1.0 + av * r)[:, None]
         return q
+
 
     _acc = {v: [] for v in _variants}
     for _sd in sorted((dataset_path / "train").iterdir()):
@@ -816,7 +925,11 @@ def _(
             _ra = np.linalg.norm(_cr - _img_c, axis=1)
             _ok = (_rp > 20) & (_kx & _ky)
             _a = (
-                float(np.linalg.lstsq(_rp[_ok, None], _ra[_ok] / np.maximum(_rp[_ok], 1e-9) - 1, rcond=None)[0][0])
+                float(
+                    np.linalg.lstsq(
+                        _rp[_ok, None], _ra[_ok] / np.maximum(_rp[_ok], 1e-9) - 1, rcond=None
+                    )[0][0]
+                )
                 if _ok.sum() >= 5
                 else 0.0
             )
@@ -827,9 +940,9 @@ def _(
             elif v == "global-radial":
                 _base, _av = _M_reg, a_global
             elif v.startswith("seq-reg-"):
-                _base, _av = _per_method[v[len("seq-reg-"):]][0], None
+                _base, _av = _per_method[v[len("seq-reg-") :]][0], None
             else:
-                _base, _av = _per_method[v[len("seq-radial-"):]]
+                _base, _av = _per_method[v[len("seq-radial-") :]]
             _q = _fwd(_corners.reshape(-1, 2), _base, _av).reshape(-1, 4, 2)
             _px0, _py0 = _q.min(axis=1).T
             _px1, _py1 = _q.max(axis=1).T
@@ -861,7 +974,10 @@ def _(functools, io, iou_ps, mo, np, plt):
     _thresholds = np.round(np.arange(0.5, 1.0, 0.05), 2)
     # ransac variants first (main comparison, bolded in the table, thicker in the plot)
     _variants = tuple(
-        sorted(iou_ps.keys(), key=lambda v: (0 if v.endswith("-ransac") else 1 if v.startswith("seq-") else 2, v))
+        sorted(
+            iou_ps.keys(),
+            key=lambda v: (0 if v.endswith("-ransac") else 1 if v.startswith("seq-") else 2, v),
+        )
     )
     _colors = {
         "global-reg": "C0",
@@ -874,8 +990,10 @@ def _(functools, io, iou_ps, mo, np, plt):
         "seq-radial-ransac": "C7",
     }
 
+
     def _ap(ious, t):
         return float(np.mean(ious >= t)) if len(ious) else float("nan")
+
 
     def _row(variant):
         x = iou_ps[variant]
@@ -885,6 +1003,7 @@ def _(functools, io, iou_ps, mo, np, plt):
             f"| {_ap(x, 0.5):.3f} | {_ap(x, 0.75):.3f} "
             f"| {np.mean([_ap(x, t) for t in _thresholds]):.3f} | {len(x)} |"
         )
+
 
     _table = "\n".join(
         [
@@ -900,34 +1019,47 @@ def _(functools, io, iou_ps, mo, np, plt):
         ]
     )
 
+
     @functools.lru_cache(maxsize=4)
     def _iou_png(_key: str) -> bytes:
         fig, axes = plt.subplots(1, 2, figsize=(10, 4), dpi=80)
         for v in _variants:
             if v.startswith("seq-reg-"):
-                axes[0].hist(iou_ps[v], bins=np.linspace(0, 1, 41), alpha=0.6, color=_colors[v], label=v)
+                axes[0].hist(
+                    iou_ps[v], bins=np.linspace(0, 1, 41), alpha=0.6, color=_colors[v], label=v
+                )
         axes[0].set_xlabel("IoU (converted ir box vs rgb gt box)")
         axes[0].set_ylabel("frames")
         axes[0].legend(fontsize=7)
-        axes[0].set_title(f"IoU distribution (seq-reg variants) - all train ({len(iou_ps['global-reg'])} frames)")
+        axes[0].set_title(
+            f"IoU distribution (seq-reg variants) - all train ({len(iou_ps['global-reg'])} frames)"
+        )
         for v in _variants:
             _main = v.endswith("-ransac")
             axes[1].plot(
-                _thresholds, [_ap(iou_ps[v], t) for t in _thresholds], color=_colors[v], label=v,
-                lw=2.5 if _main else 1.0, alpha=1.0 if _main else 0.45,
+                _thresholds,
+                [_ap(iou_ps[v], t) for t in _thresholds],
+                color=_colors[v],
+                label=v,
+                lw=2.5 if _main else 1.0,
+                alpha=1.0 if _main else 0.45,
             )
         axes[1].set_xlabel("IoU threshold t")
         axes[1].set_ylabel("AP@t")
         axes[1].set_ylim(0, 1.02)
         axes[1].legend(fontsize=7)
         axes[1].set_title("AP vs IoU threshold - all train")
-        fig.suptitle("IoU metrics: per-sequence bin-weighted fits by outlier method vs global - all train (in-sample for seq-*)")
+        fig.suptitle(
+            "IoU metrics: per-sequence bin-weighted fits by outlier method vs global - all train (in-sample for seq-*)"
+        )
         buf = io.BytesIO()
         fig.savefig(buf, format="png")
         plt.close(fig)
         return buf.getvalue()
 
+
     mo.vstack([mo.md(_table), mo.image(_iou_png("all"), width="100%")])
+    return
 
 
 if __name__ == "__main__":
