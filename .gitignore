@@ -3,6 +3,9 @@
 /output
 /outputs
 
+# model weights (large checkpoints, e.g. model_weights/edtc_yolov5s.pt)
+/model_weights/
+
 # uv related (python packaging)
 /site
 /build
