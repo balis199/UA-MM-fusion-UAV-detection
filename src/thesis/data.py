@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
-from thesis.paths import DATA_DIR
+from thesis.paths import DATA_DIR, join
 from thesis.transforms import TRANSFORM_DEFAULT
 from thesis.utils.db import load_db
 
@@ -57,7 +57,7 @@ class ImageClassification(Dataset[ItemType]):
 
         idx = int(row.idx)
         label = int(row.label)
-        path = str(self.data_dir / row.path)
+        path = str(join(self.data_dir, row.path))
 
         image = Image.open(path).convert("RGB")
         image = self.transform(image)

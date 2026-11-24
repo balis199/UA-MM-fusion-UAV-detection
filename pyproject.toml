@@ -40,6 +40,14 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.17.4",
     "scikit-learn>=1.9.1",
+    # runtime requirements of the ultralytics/yolov5 torch.hub repo 
+    "packaging",
+    "psutil",
+    "requests>=2.32.2",
+    "scipy>=1.4.1",
+    "seaborn>=0.11.0",
+    "setuptools>=70",
+    "ultralytics>=8.4.201",
 ]
 
 [tool.ruff]

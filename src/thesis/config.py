@@ -27,6 +27,9 @@ class Config:
 
     # yolo
     model_yolo_pretrained: bool = True
+    # local checkpoint (e.g. model_weights/edtc_yolov5s.pt); when set, loaded via
+    # torch.hub "custom" instead of the pretrained hub model
+    model_yolo_weights: Path | None = None
 
     # unet
     model_unet_in_channels: int = 3

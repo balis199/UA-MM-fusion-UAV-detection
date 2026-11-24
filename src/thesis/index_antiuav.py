@@ -145,7 +145,7 @@ def frame_records(
             gt_x = gt_y = gt_w = gt_h = 0
         records.append(
             FrameRecord(
-                path=str(path.relative_to(cfg.dataset_root)),
+                path=path.relative_to(cfg.dataset_root).as_posix(),
                 sequence=sequence,
                 split=split,
                 frame_id=frame_id,
@@ -192,7 +192,7 @@ def index_dataset(cfg: IndexConfig) -> Path:
                 SequenceRecord(
                     sequence=sequence,
                     split=split,
-                    path=str(sequence_dir.relative_to(cfg.dataset_root)),
+                    path=sequence_dir.relative_to(cfg.dataset_root).as_posix(),
                     num_frames=num_frames,
                 )
             )

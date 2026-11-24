@@ -28,9 +28,9 @@ def _():
     import numpy as np
     from sklearn.linear_model import LinearRegression
 
-    dataset_path = Path("../data/Anti-UAV-RGBT")
-    if not dataset_path.exists():  # launched from the repo root instead of notebooks/
-        dataset_path = Path("data/Anti-UAV-RGBT")
+    from thesis.paths import ANTI_UAV_DATA_DIR
+
+    dataset_path = ANTI_UAV_DATA_DIR  # anchored at the repo root, independent of cwd
     seq_names = sorted(d.name for d in (dataset_path / "test").iterdir() if d.is_dir())
     return (
         LinearRegression,

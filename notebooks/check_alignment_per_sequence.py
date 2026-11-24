@@ -31,9 +31,9 @@ def _():
     import numpy as np
     from sklearn.linear_model import LinearRegression, RANSACRegressor
 
-    dataset_path = Path("../data/Anti-UAV-RGBT")
-    if not dataset_path.exists():  # launched from the repo root instead of notebooks/
-        dataset_path = Path("data/Anti-UAV-RGBT")
+    from thesis.paths import ANTI_UAV_DATA_DIR
+
+    dataset_path = ANTI_UAV_DATA_DIR  # anchored at the repo root, independent of cwd
     # per-sequence calibration is explored on the TRAIN split for now; applying it to
     # test sequences without leakage is an open assumption (a test sequence has no
     # labels to calibrate on), to be figured out later

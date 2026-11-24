@@ -1,16 +1,34 @@
+from pathlib import Path
+
 import torch
 
 from thesis.config import Config
+
+# torch.hub entry point for YOLOv5. The master hubconf imports the `ultralytics`
+# package and handles torch>=2.6 weights_only loading of pickled checkpoints,
+# so `ultralytics` (plus yolov5's other hub requirements) must be installed -
+# see the dev dependency group in pyproject.toml.
+YOLOV5_HUB_REPO = "ultralytics/yolov5"
 
 
 def load_model(cfg: Config, device: torch.device, train: bool) -> torch.nn.Module:
 
     if "yolo" in cfg.model_name:
-        model = torch.hub.load(
-            "ultralytics/yolov5",
-            cfg.model_name,
-            pretrained=cfg.model_yolo_pretrained,
-        )
+        if cfg.model_yolo_weights is not None:
+            # local checkpoint, e.g. model_weights/edtc_yolov5s.pt
+            model = torch.hub.load(
+                YOLOV5_HUB_REPO,
+                "custom",
+                path=str(Path(cfg.model_yolo_weights)),
+                trust_repo=True,
+            )
+        else:
+            model = torch.hub.load(
+                YOLOV5_HUB_REPO,
+                cfg.model_name,
+                pretrained=cfg.model_yolo_pretrained,
+                trust_repo=True,
+            )
 
     elif "unet" in cfg.model_name:
         model = torch.hub.load(

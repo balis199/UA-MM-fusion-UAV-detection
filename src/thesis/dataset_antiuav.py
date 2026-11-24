@@ -29,7 +29,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
 from thesis.index_antiuav import SPLITS
-from thesis.paths import ANTI_UAV_DATA_DIR
+from thesis.paths import ANTI_UAV_DATA_DIR, join
 from thesis.transforms import TRANSFORM_DEFAULT
 from thesis.utils.db import load_db
 
@@ -143,8 +143,8 @@ class AntiUAVFrames(Dataset[SampleType]):
         return len(self.df)
 
     def _load_image(self, relative: str, channels: int) -> Image.Image:
-        # index paths may contain Windows separators; forward slashes work everywhere
-        image = Image.open(self.dataset_root / relative.replace("\\", "/"))
+        # index paths may contain Windows separators; join() normalizes them on any OS
+        image = Image.open(join(self.dataset_root, relative))
         return image.convert("L" if channels == 1 else "RGB")
 
     @override
