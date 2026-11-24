@@ -1,6 +1,6 @@
 """Main PyTorch Dataset over the Anti-UAV RGB-T sqlite index.
 
-Joins the frames rgb and frames thermal tables written by thesis.index_antiuav
+Joins the frames_rgb and frames_thermal tables written by thesis.index_antiuav
 on (sequence, frame_id) - both modalities are cut up with the same parameters,
 so they align 1:1 - and yields one sample per RGB-T frame pair:
 
@@ -97,8 +97,8 @@ class AntiUAVFrames(Dataset[SampleType]):
         self.thermal_transform = thermal_transform if thermal_transform is not None else transform
         self.thermal_channels = thermal_channels
 
-        rgb = load_db(db_path, "frames rgb")
-        thermal = load_db(db_path, "frames thermal")
+        rgb = load_db(db_path, "frames_rgb")
+        thermal = load_db(db_path, "frames_thermal")
         rgb = rgb[rgb["split"] == split].rename(columns={"path": "rgb_path"})
         # keep the thermal gt boxes too: they live in the thermal image's own pixel
         # coordinates (e.g. 640x512 vs 1920x1080 for rgb)

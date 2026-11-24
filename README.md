@@ -7,46 +7,46 @@ Project structure adapted from am00ma/thesis-template.
 ## Current status
 
 - **Data pipeline is done**: the Anti-UAV RGB-T videos are cut up into per-frame PNGs (`data/Anti-UAV-RGBT/processed/`) and indexed into a SQLite database (`index.db`) that maps every frame to its ground-truth box, drone-presence flag and adverse-condition tags.
-- **A PyTorch dataloader now exists**: `src/thesis/dataset_antiuav.py` (`AntiUAVFrames`) joins the `frames rgb` / `frames thermal` index tables on `(sequence, frame_id)` and yields aligned RGB-T frame-pair samples (images, per-modality GT boxes, drone flag, condition one-hots). `scripts/dataloader_antiuav_script.py` iterates batches of it as a smoke test. These files are new and not committed yet.
+- **A PyTorch dataloader now exists**: `src/thesis/dataset_antiuav.py` (`AntiUAVFrames`) joins the `frames_rgb` / `frames_thermal` index tables on `(sequence, frame_id)` and yields aligned RGB-T frame-pair samples (images, per-modality GT boxes, drone flag, condition one-hots). `scripts/dataloader_antiuav_script.py` iterates batches of it as a smoke test.
 - **Modality alignment was explored and ruled out**: the RGB and IR ground-truth boxes themselves disagree, so pixel-level alignment of the two streams is not feasible to rely on. Current direction is **unaligned fusion**; "disagreement uncertainty" cannot be separated from GT disagreement, so it is not very explorable.
-- **Model side is in early stages**: YOLOv5/UNet loading via `torch.hub` (`models.py`) and a feature-extraction loop (`extract.py`) exist, plus a YOLOv5s checkpoint (`model_weights/edtc_yolov5s.pt`) and an empty `notebooks/predict_thermal_edtc.ipynb` placeholder for thermal prediction. There is no fusion model, training loop or evaluation yet (`eval.py` and `metrics.py` are empty placeholders).
+- **Model side is in early stages**: YOLOv5/UNet loading via `torch.hub` (`models.py`) and a feature-extraction loop over the Anti-UAV frames (`extract_antiuav.py`) exist, plus a YOLOv5s checkpoint (`model_weights/edtc_yolov5s.pt`) and `notebooks/predict_thermal_edtc_antiuav.ipynb` with first thermal predictions from that checkpoint. There is no fusion model, training loop or evaluation yet (`eval.py` and `metrics.py` are placeholders).
 
 ## Repository layout
 
 ```
-├── config/default.json                 # default run configuration
+├── TODO.md                             # prioritized next steps (config decision first)
+├── config/default.json                 # default run configuration (not loaded into Config yet — see TODO.md)
 ├── model_weights/                      # model checkpoints (untracked)
 │   └── edtc_yolov5s.pt                 #   YOLOv5s DetectionModel weights (~16 MB)
 ├── data/Anti-UAV-RGBT/                 # dataset root (gitignored, ~30 GB, NOT in the repo)
 │   ├── train/ val/ test/               # 160 / 67 / 91 sequences of visible.mp4/json + infrared.mp4/json
 │   ├── label_new/                      # <split>.json: sequence -> adverse-condition tags
 │   ├── processed/                      # cut-up frames: <split>/<seq>/{visible,infrared}/*.png
-│   ├── index.db                        # SQLite index: tables [frames rgb], [frames thermal], [sequences]
+│   ├── index.db                        # SQLite index: tables [frames_rgb], [frames_thermal], [sequences]
 │   ├── datasette-metadata.yml          # canned queries for the datasette UI
 │   └── framecut.py                     # original dataset video->jpg helper (not used by the pipeline)
+├── experiments/ logs/                  # reserved for run outputs (kept via .gitkeep, contents gitignored)
 ├── notebooks/
 │   ├── check_antiuav.ipynb             # sanity check: show one RGB/IR frame + GT box per modality
-│   ├── check_alignment.ipynb           # RGB/IR alignment: naive overlay, GT-center affine, train-only regression
-│   ├── check_alignment_interactive.py  # marimo app: global transforms (reg/radial/fisheye/+wh), IoU & AP on test
-│   ├── check_alignment_per_sequence.py # marimo app: per-sequence fits with outlier handling (none/mad/ransac)
-│   └── predict_thermal_edtc.ipynb      # EMPTY placeholder for thermal prediction with edtc_yolov5s.pt
+│   ├── check_alignment_antiuav.ipynb   # RGB/IR alignment: naive overlay, GT-center affine, train-only regression
+│   ├── check_alignment_interactive_antiuav.py   # marimo app: global transforms (reg/radial/fisheye/+wh), IoU & AP on test
+│   ├── check_alignment_per_sequence_antiuav.py  # marimo app: per-sequence fits with outlier handling (none/mad/ransac)
+│   └── predict_thermal_edtc_antiuav.ipynb  # first thermal predictions with edtc_yolov5s.pt
 ├── scripts/
 │   ├── preprocess_antiuav_script.py    # CLI wrapper around the preprocessing pipeline
 │   ├── datasette_script.py             # serve index.db + frame thumbnails in datasette
-│   ├── dataloader_antiuav_script.py    # CLI: iterate DataLoader batches of AntiUAVFrames over one split
-│   └── dataloader_antiuav_script_removed.md  # dev notes: what was removed from the dataloader script + how to re-add
+│   └── dataloader_antiuav_script.py    # CLI: iterate DataLoader batches of AntiUAVFrames over one split
 └── src/thesis/
     ├── paths.py                        # repo path constants (DATA_DIR, OUTPUT_DIR, ANTI_UAV_DATA_DIR, ...)
     ├── config.py                       # Config dataclass: data + model (yolo/unet) settings
     ├── preprocess_antiuav.py           # Frame / Sequence / Preprocess: video -> cut-up frames (resumable)
     ├── index_antiuav.py                # build index.db from processed frames + raw labels + conditions
     ├── dataset_antiuav.py              # AntiUAVFrames: torch Dataset of aligned RGB-T frame pairs over index.db
-    ├── data.py                         # torch Dataset over a sqlite index (template legacy, superseded by dataset_antiuav.py)
-    ├── transforms.py                   # default image transform + YOLO NMS box post-processing
+    ├── transforms.py                   # default image transform + YOLO NMS box post-processing (sample for custom transforms)
     ├── models.py                       # load_model(): yolov5 (ultralytics) / unet (brain-segmentation-pytorch) via torch.hub
-    ├── extract.py                      # feature-extraction loop over a dataset (work in progress)
-    ├── eval.py, metrics.py             # empty placeholders
-    └── utils/                          # JSON helpers, sqlite helpers (db.py), git status helper
+    ├── extract_antiuav.py              # feature-extraction loop over AntiUAVFrames (work in progress)
+    ├── eval.py, metrics.py             # placeholders for the upcoming evaluation
+    └── utils/                          # sqlite helpers (db.py), git status helper (git.py), json helpers (json_io.py)
 ```
 
 ## Setup
@@ -61,7 +61,20 @@ The distribution is named `ua-mm-fusion-uav-detection`, but the import package s
 
 Runtime dependencies (what `src/thesis` actually imports): torch, torchvision, opencv-python, numpy, pandas, Pillow, tqdm.
 The dev group adds the notebook/exploration tooling: jupyter, ipykernel, marimo, matplotlib, scikit-learn, distinctipy, pyyaml, datasette + datasette-render-image-tags, and ruff (lint/format, line-length 100, configured in `pyproject.toml`).
-`.vscode/settings.json` enables ruff format-on-save.
+`.vscode/settings.json` enables ruff format-on-save. Ruff is configured in `pyproject.toml` (line-length 100); `notebooks/` is excluded from `ruff check`/`ruff format` runs (the editor still formats notebooks on save).
+
+## Quick reference
+
+```bash
+uv sync                                                            # setup
+uv run python scripts/preprocess_antiuav_script.py --step 10       # videos -> frames (resumable)
+uv run python src/thesis/index_antiuav.py                          # frames + labels -> index.db
+uv run python scripts/datasette_script.py                          # browse the index at http://127.0.0.1:8001
+uv run python scripts/dataloader_antiuav_script.py --split val --batch-size 8 --max-batches 5
+uv run python src/thesis/extract_antiuav.py                        # feature extraction over a split
+uv run marimo edit notebooks/check_alignment_interactive_antiuav.py  # marimo alignment app
+uv run ruff check . && uv run ruff format --check .                # lint/format
+```
 
 ## Dataset: Anti-UAV RGB-T
 
@@ -93,8 +106,8 @@ Builds `data/Anti-UAV-RGBT/index.db` with three tables:
 
 | table            | rows    | columns                                                                 |
 |------------------|---------|-------------------------------------------------------------------------|
-| `frames rgb`     | 29,727  | path, sequence, split, frame_id, gt_x/y/w/h, drone_exists, 10 one-hot condition columns |
-| `frames thermal` | 29,727  | same as `frames rgb`                                                     |
+| `frames_rgb`     | 29,727  | path, sequence, split, frame_id, gt_x/y/w/h, drone_exists, 10 one-hot condition columns |
+| `frames_thermal` | 29,727  | same as `frames_rgb`                                                     |
 | `sequences`      | 318     | sequence, split, path, num_frames                                        |
 
 ### 3. Browse in datasette
@@ -112,7 +125,7 @@ Serves `index.db` (immutable) with the dataset folder mounted at `/dataset/...`,
 uv run python scripts/dataloader_antiuav_script.py --split val --batch-size 8 --max-batches 5
 ```
 
-`AntiUAVFrames` (`src/thesis/dataset_antiuav.py`) joins `frames rgb` and `frames thermal` on `(sequence, frame_id)` — both modalities are cut up with the same parameters, so they align 1:1 — and returns one dict sample per RGB-T pair:
+`AntiUAVFrames` (`src/thesis/dataset_antiuav.py`) joins `frames_rgb` and `frames_thermal` on `(sequence, frame_id)` — both modalities are cut up with the same parameters, so they align 1:1 — and returns one dict sample per RGB-T pair:
 
 | key            | content                                                              |
 |----------------|----------------------------------------------------------------------|
@@ -129,29 +142,28 @@ Options: `split`, `dataset_root`, `db_name`, `transform`/`thermal_transform`, `t
 ### 5. Notebooks
 
 - `check_antiuav.ipynb` — quick data sanity check (Jupyter).
-- `check_alignment_interactive.py` / `check_alignment_per_sequence.py` — marimo apps for the RGB/IR alignment analysis:
+- `check_alignment_interactive_antiuav.py` / `check_alignment_per_sequence_antiuav.py` — marimo apps for the RGB/IR alignment analysis:
 
   ```bash
-  uv run marimo edit notebooks/check_alignment_interactive.py
+  uv run marimo edit notebooks/check_alignment_interactive_antiuav.py
   ```
 
-- `predict_thermal_edtc.ipynb` — placeholder (empty file) for prediction with `model_weights/edtc_yolov5s.pt`.
+- `predict_thermal_edtc_antiuav.ipynb` — first thermal-frame predictions with `model_weights/edtc_yolov5s.pt`.
 
 ## Configuration
 
-`config/default.json` and the `Config` dataclass in `src/thesis/config.py` hold run settings: data dir/name/split/frac/seed/batch size and the model (`yolov5s` with pretrained weights, or `unet`). The dataloader path does not use `Config` yet — it takes its kwargs directly on `AntiUAVFrames`.
+The `Config` dataclass in `src/thesis/config.py` holds run settings: data dir/name/split/frac/seed/batch size and the model (`yolov5s` with pretrained weights, or `unet`). `config/default.json` mirrors these but is **not loaded by any code yet** — wiring it up (or dropping it) is the first item in `TODO.md`. The dataloader path does not use `Config` — it takes its kwargs directly on `AntiUAVFrames`.
 
 ## Notes / known quirks
 
-- The dataloader work (`src/thesis/dataset_antiuav.py`, `scripts/dataloader_antiuav_script.py`, `scripts/dataloader_antiuav_script_removed.md`, `notebooks/predict_thermal_edtc.ipynb`, `model_weights/`) is **untracked / not committed yet** — it exists only in the working tree of the `torch-dataloader` branch.
-- `notebooks/predict_thermal_edtc.ipynb` is an empty (0-byte) placeholder; `scripts/dataloader_antiuav_script_removed.md` is a dev-history note listing code removed from the dataloader script and how to re-add it (it references a `src/thesis/dataset_antiuav_removed.md` that does not exist).
-- `src/thesis/data.py` and `src/thesis/extract.py` still target the template's toy `data/boxes` dataset (`fixed-rectangles` index db) and are not wired to Anti-UAV; the Anti-UAV data flow goes through `preprocess_antiuav.py` -> `index_antiuav.py` -> `index.db` -> `dataset_antiuav.py` instead.
+- The template's toy-dataset code was removed/rewired: `src/thesis/data.py` (targeted a nonexistent `data/boxes` index) is deleted; `src/thesis/extract_antiuav.py` now runs over `AntiUAVFrames`. The Anti-UAV data flow is `preprocess_antiuav.py` -> `index_antiuav.py` -> `index.db` -> `dataset_antiuav.py`.
+- `src/thesis/eval.py` and `metrics.py` are placeholders for the upcoming evaluation; `experiments/` and `logs/` are reserved for run outputs (contents gitignored).
 - No console script is installed — run the CLIs directly, e.g. `uv run python scripts/dataloader_antiuav_script.py --split val`. (Distribution name: `ua-mm-fusion-uav-detection`; import package: `thesis`.)
-- `data/`, `outputs/`, `model_weights/`, `.venv/`, `uv.lock` and caches are gitignored — only code, config and notebooks are tracked.
+- `data/`, `outputs/`, `model_weights/`, `experiments/*`, `logs/*`, `.venv/`, `uv.lock` and caches are gitignored — only code, config, docs and notebooks are tracked.
 
 ## Branches
 
-- `torch-dataloader` (checked out) — same commit as `main` (ccbbd63) plus the uncommitted dataloader/model-weights work described above
+- `torch-dataloader` (checked out) — dataloader + model weights + EDTC prediction notebook + repo restructure
 - `main` — preprocessing + indexing + alignment exploration (PR #1 merged)
 - `alignment-exploration` — the alignment-analysis branch (merged into main)
 

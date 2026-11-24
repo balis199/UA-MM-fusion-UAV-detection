@@ -3,8 +3,8 @@
 Provides a dataclass based interface for creating a sqlite database of all frames in the preprocessed Anti-UAV RGB-T dataset and their related sequences.
 
 3 separate tables are created in the database:
-- `frames rgb`: contains all rgb frames in the dataset, with their path, sequence, frame number and all label data (gt bb, drone exists, conditions)
-- `frames thermal`: contains all thermal frames in the dataset, with their path, sequence, frame number and all label data (gt bb, drone exists, conditions)
+- `frames_rgb`: contains all rgb frames in the dataset, with their path, sequence, frame number and all label data (gt bb, drone exists, conditions)
+- `frames_thermal`: contains all thermal frames in the dataset, with their path, sequence, frame number and all label data (gt bb, drone exists, conditions)
 - `sequences`: contains all sequences in the dataset, with their path and number of frames
 """
 
@@ -25,8 +25,8 @@ SPLITS: tuple[str, ...] = ("train", "val", "test")
 
 # table name -> modality folder inside processed/<split>/<sequence>/
 MODALITY_TABLES: dict[str, str] = {
-    "frames rgb": "visible",
-    "frames thermal": "infrared",
+    "frames_rgb": "visible",
+    "frames_thermal": "infrared",
 }
 
 FRAME_FILE = re.compile(r"_frame_(\d+)\.png$")
@@ -34,7 +34,7 @@ FRAME_FILE = re.compile(r"_frame_(\d+)\.png$")
 
 @dataclass
 class FrameRecord:
-    """One row of a `frames rgb` / `frames thermal` table."""
+    """One row of a `frames_rgb` / `frames_thermal` table."""
 
     path: str
     sequence: str
@@ -161,7 +161,7 @@ def frame_records(
 
 
 def index_dataset(cfg: IndexConfig) -> Path:
-    """Walk the processed dataset and write the `frames rgb`, `frames thermal`
+    """Walk the processed dataset and write the `frames_rgb`, `frames_thermal`
     and `sequences` tables to the sqlite database at ``cfg.db_path``."""
     frames: dict[str, list[FrameRecord]] = {table: [] for table in MODALITY_TABLES}
     sequences: list[SequenceRecord] = []

@@ -1,6 +1,5 @@
 # datasets, outputs
 /data
-/output
 /outputs
 
 # model weights (large checkpoints, e.g. model_weights/edtc_yolov5s.pt)
@@ -15,6 +14,7 @@
 # cache
 *.pyc
 __pycache__/
+.ruff_cache/
 .ipynb_checkpoints/
 events.out.*
 
@@ -28,5 +28,3 @@ events.out.*
 
 # user files
 .venv/
-__pycache__/
-caches

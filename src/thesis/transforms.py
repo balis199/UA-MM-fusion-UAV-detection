@@ -1,9 +1,20 @@
+"""Image transforms and YOLO box post-processing.
+
+This module is the sample for writing custom torchvision v2 transforms: subclass
+`torchvision.transforms.v2.Transform`, set `_transformed_types`, and implement
+`transform(inpt, params)`.
+
+- `TRANSFORM_DEFAULT`: default image transform used by the datasets (ToImage ->
+  Resize 224x224 -> float32 scaled).
+- `NMSYoloBoxes`: post-processes raw YOLO output ([B, N, 85]) into NMS-filtered boxes
+  prefixed with the batch index (used by `extract_antiuav.py`).
+"""
+
 from typing import Any
 
 import torch
 from torchvision.ops import nms
 from torchvision.transforms import v2
-from torchvision.transforms.v2 import Transform
 
 TRANSFORM_DEFAULT = v2.Compose(
     [
@@ -14,16 +25,7 @@ TRANSFORM_DEFAULT = v2.Compose(
 )
 
 
-class Flatten(Transform):
-    """Convert [B, N, D] to [B, N*D]."""
-
-    _transformed_types = (torch.Tensor,)
-
-    def transform(self, inpt: torch.Tensor, params: dict[str, Any]) -> torch.Tensor:
-        return inpt.view(inpt.size(0), -1)
-
-
-class NMSYoloBoxes(Transform):
+class NMSYoloBoxes(v2.Transform):
     """Performs non-maximum-suppression on [32, 3087, 85] batch of yolo boxes.
 
     Uses torchvision.ops.nms with:
@@ -52,7 +54,7 @@ class NMSYoloBoxes(Transform):
     def transform(self, inpt: torch.Tensor, params: dict[str, Any]) -> torch.Tensor:
 
         filtered = []
-        for idx, features in zip(range(len(inpt)), inpt):
+        for idx, features in zip(range(len(inpt)), inpt, strict=True):
             boxes = features[:, :4]  # xyhw
             scores = features[:, 4]
 
@@ -80,10 +82,3 @@ class NMSYoloBoxes(Transform):
         filtered = torch.vstack(filtered)
 
         return filtered
-
-
-POSTPROC_YOLO_BOXES = v2.Compose(
-    [
-        NMSYoloBoxes(0.3, 0.3),
-    ]
-)

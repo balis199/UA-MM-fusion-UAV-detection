@@ -22,11 +22,15 @@ def check_git_status():
             raise RuntimeError("Not a git repository")
 
         # Get the current commit hash (regardless of dirty state)
-        commit_hash_result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
+        commit_hash_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
         commit_hash = commit_hash_result.stdout.strip()
 
-        # Check if there are unstaged changes
-        diff_result = subprocess.run(["git", "diff", "--quiet"], capture_output=True, text=True)
+        # Check if there are unstaged changes (returncode is inspected, so check=False)
+        diff_result = subprocess.run(
+            ["git", "diff", "--quiet"], capture_output=True, text=True, check=False
+        )
 
         # Return dirty-{hash} if unstaged changes exist (git diff returns 1)
         if diff_result.returncode == 1:

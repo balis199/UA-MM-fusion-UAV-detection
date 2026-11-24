@@ -52,3 +52,12 @@ dev = [
 
 [tool.ruff]
 line-length = 100
+# notebooks/ holds marimo/jupyter exploration apps (generated cell style trips lint and
+# format checks). The editor still lints/formats them on save, because files passed
+# explicitly to ruff bypass excludes (force-exclude defaults to false).
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# PL (pylint) rules are deliberately not selected: PLR0913/PLR0917/PLR2004 would force
+# refactors of perfectly readable signatures (e.g. AntiUAVFrames.__init__)
+select = ["E4", "E7", "E9", "F", "W", "I", "UP", "B", "SIM", "RUF", "ISC"]

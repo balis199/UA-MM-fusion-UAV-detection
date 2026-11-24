@@ -42,7 +42,7 @@ def load_json(
     """Load JSON dictionary from file."""
 
     # Load from file
-    with open(path, "r") as f:
+    with open(path) as f:
         data = json.load(f)
 
     # Convert paths to strings

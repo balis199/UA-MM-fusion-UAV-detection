@@ -9,7 +9,7 @@ Canned queries are kept in <db-dir>/datasette-metadata.yml, so they persist betw
 runs and can also be edited by hand. Add new ones per run with --query NAME SQL
 (repeatable), e.g. rgb thumbnails:
 
-    --query rgb_thumbs "select 'http://{host}:{port}/dataset/' || replace(path, '\\', '/') as image, * from [frames rgb] limit 100"
+    --query rgb_thumbs "select 'http://{host}:{port}/dataset/' || replace(path, '\\', '/') as image, * from [frames_rgb] limit 100"
 
 {host} and {port} are substituted. Frames are mounted at /dataset/<path>, so image
 URLs render inline via datasette-render-image-tags. Open http://127.0.0.1:8001 to browse.
