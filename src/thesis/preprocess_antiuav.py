@@ -1,10 +1,10 @@
 """Dataclass-based preprocessing for Anti-UAV RGB-T sequences.
 
 Two levels of abstraction:
-- :class:`Sequence` — which frames belong together: cut up into folders,
-  index single frames, and take time-shifted windows (RGB/thermal stay in sync
+- :class:`Sequence`: which frames belong together (cut up into folders,
+  index single frames, and take time-shifted windows; RGB/thermal stay in sync
   because the shift is defined once per sequence).
-- :class:`Frame` — what a single frame looks like: resize. Image operations
+- :class:`Frame`: what a single frame looks like (resize). Image operations
   return new ``Frame`` instances instead of mutating.
 
 :class:`Preprocess` walks a dataset root (``<root>/<split>/<sequence_id>/``

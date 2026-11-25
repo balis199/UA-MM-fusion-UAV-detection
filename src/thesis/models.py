@@ -50,15 +50,3 @@ def load_model(cfg: Config, device: torch.device, train: bool) -> torch.nn.Modul
         model.eval()
 
     return model
-
-
-if __name__ == "__main__":
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    cfg = Config(model_name="yolov5s")
-    model = load_model(cfg, DEVICE, False)
-    print(model)
-
-    cfg = Config(model_name="unet")
-    model = load_model(cfg, DEVICE, False)
-    print(model)

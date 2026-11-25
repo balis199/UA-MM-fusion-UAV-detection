@@ -1,9 +1,10 @@
 """Iterate a few batches of the Anti-UAV RGB-T DataLoader over one split.
 
-The sqlite index must exist already - build it with "python src/thesis/index_antiuav.py".
+The sqlite index must exist already: build it with "uv run python scripts/index_antiuav_script.py".
 
 Example:
     python scripts/dataloader_antiuav_script.py --split val --batch-size 8 --max-batches 5
+    python scripts/dataloader_antiuav_script.py --split test --conditions FM --drone-only
 """
 
 from __future__ import annotations
@@ -34,6 +35,27 @@ def main() -> None:
     )
     parser.add_argument("--drone-only", action="store_true", help="Keep only frames with a drone")
     parser.add_argument(
+        "--conditions",
+        nargs="*",
+        default=None,
+        metavar="TAG",
+        help="Keep only frames whose sequence has these condition tags; 'neutral' = no tags "
+        "(e.g. --conditions FM LI, or --conditions neutral)",
+    )
+    parser.add_argument(
+        "--condition-how",
+        choices=["any", "all"],
+        default="any",
+        help="With --conditions: keep frames with any or all of the tags (default: any)",
+    )
+    parser.add_argument(
+        "--sequences",
+        nargs="*",
+        default=None,
+        metavar="SEQ",
+        help="Restrict to these sequence ids (e.g. --sequences 01739 01740)",
+    )
+    parser.add_argument(
         "--frac",
         type=float,
         default=1.0,
@@ -43,10 +65,11 @@ def main() -> None:
     parser.add_argument("--no-shuffle", action="store_true", help="Disable shuffling")
     args = parser.parse_args()
 
-    dataset = AntiUAVFrames(
-        split=args.split,
-        dataset_root=ANTI_UAV_DATA_DIR,
-        drone_only=args.drone_only,
+    dataset = AntiUAVFrames(split=args.split, dataset_root=ANTI_UAV_DATA_DIR).view(
+        conditions=args.conditions,
+        how=args.condition_how,
+        drone_only=True if args.drone_only else None,
+        sequences=args.sequences,
         frac=args.frac,
         seed=args.seed,
     )
@@ -62,8 +85,12 @@ def main() -> None:
     print(f"Split      : {args.split} ({len(dataset)} frame pairs, {split_drones} with drone)")
     print(f"Conditions : {dataset.condition_columns}")
     print(
+        f"View       : conditions={args.conditions} (how={args.condition_how}), "
+        f"sequences={args.sequences}, drone_only={args.drone_only}, frac={args.frac}"
+    )
+    print(
         f"Loader     : batch_size={args.batch_size}, shuffle={not args.no_shuffle}, "
-        f"num_workers={args.num_workers}, drone_only={args.drone_only}, frac={args.frac}\n"
+        f"num_workers={args.num_workers}\n"
     )
 
     max_batches = args.max_batches or None  # 0 -> iterate the whole split

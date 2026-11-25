@@ -1,6 +1,6 @@
 """Serve the Anti-UAV RGB-T index database in Datasette, with inline frame thumbnails.
 
-Expects the sqlite index to exist already (build it with `python src/thesis/index_antiuav.py`),
+Expects the sqlite index to exist already (build it with `uv run python scripts/index_antiuav_script.py`),
 then runs:
 
     datasette serve --immutable <db> --static dataset:<dataset_root> -m <metadata>
@@ -97,7 +97,7 @@ def main() -> None:
     db_path = args.db.expanduser().resolve()
     if not db_path.exists():
         parser.error(
-            f"database missing: {db_path} - build the index first with `python src/thesis/index_antiuav.py`"
+            f"database missing: {db_path}; build the index first with `uv run python scripts/index_antiuav_script.py`"
         )
 
     metadata_path = db_path.parent / METADATA_NAME

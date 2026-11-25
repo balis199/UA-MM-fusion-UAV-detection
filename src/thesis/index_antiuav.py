@@ -205,8 +205,3 @@ def index_dataset(cfg: IndexConfig) -> Path:
     save_db(sequences_df, cfg.db_path, "sequences")
     print(f"Saved {len(sequences_df)} rows to table 'sequences' in {cfg.db_path}")
     return cfg.db_path
-
-
-if __name__ == "__main__":
-    cfg = IndexConfig(dataset_root=ANTI_UAV_DATA_DIR)
-    index_dataset(cfg)

@@ -6,7 +6,7 @@ with `NMSYoloBoxes`, and saves the features to an npz file (key 'data') under
 `cfg.output_dir`.
 
 Run:
-    uv run python src/thesis/extract_antiuav.py
+    uv run python scripts/extract_antiuav_script.py
 """
 
 from pathlib import Path
@@ -54,10 +54,3 @@ def extract_features(cfg: Config, device: torch.device, modality: str = "rgb") -
     np.savez(out_path, data=data)
     print(f"{data.shape} -> {out_path}")
     return out_path
-
-
-if __name__ == "__main__":
-    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-    cfg = Config(model_name="yolov5s", model_yolo_pretrained=True, data_split="train")
-    extract_features(cfg, DEVICE, modality="rgb")

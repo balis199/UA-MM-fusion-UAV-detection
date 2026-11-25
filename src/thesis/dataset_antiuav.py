@@ -1,8 +1,8 @@
 """Main PyTorch Dataset over the Anti-UAV RGB-T sqlite index.
 
 Joins the frames_rgb and frames_thermal tables written by thesis.index_antiuav
-on (sequence, frame_id) - both modalities are cut up with the same parameters,
-so they align 1:1 - and yields one sample per RGB-T frame pair:
+on (sequence, frame_id) (both modalities are cut up with the same parameters,
+so they align 1:1) and yields one sample per RGB-T frame pair:
 
 - rgb / thermal: transformed image tensors (thermal as RGB, or single-channel
   grayscale with thermal_channels=1),
@@ -16,21 +16,31 @@ Samples are plain dicts, so the default collate of torch.utils.data.DataLoader
 batches them (tensors are stacked, strings become lists, ints become tensors).
 Build the loader at the call site, e.g. DataLoader(dataset, batch_size=32).
 The full index table stays available as dataset.df.
+
+Sub-dataset views: `view(conditions=..., how="any"|"all", drone_only=...,
+sequences=[...], frac=..., seed=...)` returns a lightweight chainable subset over the
+same df without re-reading index.db; pass the virtual tag NEUTRAL ("neutral") in
+`conditions` for frames whose sequence has no adverse tags at all. `with_transform(...)`
+swaps the rgb/thermal transforms on a copy. The generic machinery lives in
+thesis.utils.dataset.DataFrameDataset.
 """
 
 from __future__ import annotations
 
+import warnings
+from collections.abc import Collection
 from pathlib import Path
-from typing import Any, override
+from typing import Literal, Self, override
 
+import pandas as pd
 import torch
 from PIL import Image
-from torch.utils.data import Dataset
 from torchvision.transforms import v2
 
 from thesis.index_antiuav import SPLITS
 from thesis.paths import ANTI_UAV_DATA_DIR, join
 from thesis.transforms import TRANSFORM_DEFAULT
+from thesis.utils.dataset import DataFrameDataset, SampleType
 from thesis.utils.db import load_db
 
 # columns every frames table has besides the one-hot condition columns
@@ -46,10 +56,12 @@ BASE_COLUMNS: tuple[str, ...] = (
     "drone_exists",
 )
 
-SampleType = dict[str, Any]
+# virtual condition usable in AntiUAVFrames.view(conditions=[...]): frames whose sequence
+# has no adverse tags at all, i.e. none of the one-hot condition columns is 1
+NEUTRAL = "neutral"
 
 
-class AntiUAVFrames(Dataset[SampleType]):
+class AntiUAVFrames(DataFrameDataset):
     """Temporally Aligned RGB-T frame pairs of one split, indexed by the sqlite database.
 
     Args:
@@ -90,8 +102,8 @@ class AntiUAVFrames(Dataset[SampleType]):
         db_path = self.dataset_root / db_name
         if not db_path.exists():
             raise FileNotFoundError(
-                f"Index database not found: {db_path} - "
-                'build it first with "python src/thesis/index_antiuav.py"'
+                f"Index database not found: {db_path}. "
+                'Build it first with "uv run python scripts/index_antiuav_script.py"'
             )
         self.transform = transform
         self.thermal_transform = thermal_transform if thermal_transform is not None else transform
@@ -136,11 +148,82 @@ class AntiUAVFrames(Dataset[SampleType]):
             df = df[df["drone_exists"] == 1].reset_index(drop=True)
         if frac < 1.0:
             df = df.sample(frac=frac, random_state=seed).reset_index(drop=True)
-        self.df = df
+        super().__init__(df)
 
     @override
-    def __len__(self) -> int:
-        return len(self.df)
+    def view(
+        self,
+        *,
+        mask: pd.Series | None = None,
+        conditions: Collection[str] | None = None,
+        how: Literal["any", "all"] = "any",
+        drone_only: bool | None = None,
+        sequences: Collection[str] | None = None,
+        frac: float = 1.0,
+        seed: int = 7,
+    ) -> Self:
+        """Anti-UAV filter sugar on top of DataFrameDataset.view.
+
+        Args:
+            mask: Extra boolean Series aligned with self.df, ANDed with the filter
+                masks below (the generic DataFrameDataset.view argument).
+            conditions: Condition tags; keeps frames whose sequence carries them. The
+                virtual tag NEUTRAL ("neutral") selects frames whose sequence has no tags
+                at all (none of the condition columns == 1), e.g. conditions=["neutral"].
+                how="all" with NEUTRAL plus any other condition always yields an empty
+                view, so a warning is issued for that combination.
+            how: "any" keeps frames matching at least one of the conditions, "all" requires all.
+            drone_only: Additionally keep only frames with drone_exists == 1;
+                None keeps the parent's current filtering.
+            sequences: Additionally restrict to these sequence ids.
+            frac: Keep only this fraction of the filtered frames.
+            seed: Random state for frac subsampling.
+        """
+        if how not in ("any", "all"):
+            raise ValueError(f'how must be "any" or "all", got {how!r}')
+        if conditions is not None and len(conditions) == 0:
+            raise ValueError("conditions=[] selects nothing; use conditions=[NEUTRAL] for no-tags")
+        if (
+            conditions is not None
+            and how == "all"
+            and NEUTRAL in conditions
+            and len(conditions) > 1
+        ):
+            warnings.warn(
+                f'how="all" with NEUTRAL and other conditions {list(conditions)} always '
+                "returns an empty view (a frame cannot be both neutral and tagged)",
+                stacklevel=2,
+            )
+
+        filters: pd.Series | None = None
+        if conditions is not None:
+            valid = [*self.condition_columns, NEUTRAL]
+            unknown = [c for c in conditions if c not in valid]
+            if unknown:
+                raise ValueError(f"Unknown conditions {unknown}; choose from {valid}")
+            neutral_mask = self.df[self.condition_columns].sum(axis=1) == 0
+            masks = [neutral_mask if c == NEUTRAL else self.df[c] == 1 for c in conditions]
+            filters = masks[0]
+            for m in masks[1:]:
+                filters = filters | m if how == "any" else filters & m
+        if sequences is not None:
+            seq_mask = self.df["sequence"].isin(list(sequences))
+            filters = seq_mask if filters is None else filters & seq_mask
+        if drone_only:
+            drone_mask = self.df["drone_exists"] == 1
+            filters = drone_mask if filters is None else filters & drone_mask
+        if mask is not None:
+            filters = mask if filters is None else filters & mask
+        return super().view(mask=filters, frac=frac, seed=seed)
+
+    @override
+    def with_transform(
+        self, transform: v2.Transform, thermal_transform: v2.Transform | None = None
+    ) -> Self:
+        """Copy with swapped rgb/thermal transforms; shares the df (see DataFrameDataset)."""
+        new = super().with_transform(transform)
+        new.thermal_transform = thermal_transform if thermal_transform is not None else transform
+        return new
 
     def _load_image(self, relative: str, channels: int) -> Image.Image:
         # index paths may contain Windows separators; join() normalizes them on any OS
@@ -148,8 +231,9 @@ class AntiUAVFrames(Dataset[SampleType]):
         return image.convert("L" if channels == 1 else "RGB")
 
     @override
-    def __getitem__(self, idx: int) -> SampleType:
-        row = self.df.iloc[idx]
+    def __getitem__(self, index: int) -> SampleType:
+        # parameter name must stay "index" to match torch.utils.data.Dataset.__getitem__
+        row = self.df.iloc[index]
         return {
             "rgb": self.transform(self._load_image(str(row["rgb_path"]), 3)),
             "thermal": self.thermal_transform(
@@ -176,16 +260,3 @@ class AntiUAVFrames(Dataset[SampleType]):
             "rgb_path": str(row["rgb_path"]),
             "thermal_path": str(row["thermal_path"]),
         }
-
-
-if __name__ == "__main__":
-    dataset = AntiUAVFrames(split="train")
-    print(f"{len(dataset)} frame pairs, conditions: {dataset.condition_columns}")
-    sample = dataset[0]
-    print(f"{sample['sequence']} frame {sample['frame_id']}")
-    print(
-        f"rgb {tuple(sample['rgb'].shape)}, thermal {tuple(sample['thermal'].shape)}, "
-        f"box_rgb {sample['box_rgb'].tolist()}, box_thermal {sample['box_thermal'].tolist()}, "
-        f"drone_exists {int(sample['drone_exists'])}, conditions {sample['conditions'].tolist()}"
-    )
-    print(f"paths: {sample['rgb_path']} <-> {sample['thermal_path']}")
