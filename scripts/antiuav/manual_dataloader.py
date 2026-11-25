@@ -1,10 +1,15 @@
-"""Iterate a few batches of the Anti-UAV RGB-T DataLoader over one split.
+"""Smoke-test the Anti-UAV RGB-T dataset with a manually constructed DataLoader.
 
-The sqlite index must exist already: build it with "uv run python scripts/index_antiuav_script.py".
+This runner hand-rolls the torch DataLoader (batch_size/shuffle/num_workers) and
+iterates a few batches, printing a summary. It is intentionally manual and stays as
+is: once the shared `make_dataloader(...)` factory exists (src/thesis/dataloader.py,
+TODO.md item 1), use that in all new code instead of hand-rolling DataLoader(...) calls.
+
+The sqlite index must exist already: build it with "uv run python scripts/antiuav/sqlite_index.py".
 
 Example:
-    python scripts/dataloader_antiuav_script.py --split val --batch-size 8 --max-batches 5
-    python scripts/dataloader_antiuav_script.py --split test --conditions FM --drone-only
+    python scripts/antiuav/manual_dataloader.py --split val --batch-size 8 --max-batches 5
+    python scripts/antiuav/manual_dataloader.py --split test --conditions FM --drone-only
 """
 
 from __future__ import annotations
@@ -15,8 +20,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from thesis.dataset_antiuav import AntiUAVFrames
-from thesis.index_antiuav import SPLITS
+from thesis.antiuav.dataset import AntiUAVFrames
+from thesis.antiuav.index import SPLITS
 from thesis.paths import ANTI_UAV_DATA_DIR
 
 

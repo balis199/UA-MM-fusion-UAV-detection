@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from thesis.antiuav.preprocess import Preprocess
 from thesis.paths import ANTI_UAV_DATA_DIR
-from thesis.preprocess_antiuav import Preprocess
 
 
 def main() -> None:

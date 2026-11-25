@@ -6,7 +6,7 @@ with `NMSYoloBoxes`, and saves the features to an npz file (key 'data') under
 `cfg.output_dir`.
 
 Run:
-    uv run python scripts/extract_antiuav_script.py
+    uv run python scripts/antiuav/extract_features.py
 """
 
 from pathlib import Path
@@ -16,8 +16,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from thesis.antiuav.dataset import AntiUAVFrames
 from thesis.config import Config
-from thesis.dataset_antiuav import AntiUAVFrames
 from thesis.models import load_model
 from thesis.paths import ANTI_UAV_DATA_DIR
 from thesis.transforms import NMSYoloBoxes

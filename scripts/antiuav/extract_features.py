@@ -1,13 +1,13 @@
 """Run feature extraction over one split of the Anti-UAV RGB-T frame pairs.
 
-Iterates a split of `AntiUAVFrames` (see scripts/dataloader_antiuav_script.py for the
+Iterates a split of `AntiUAVFrames` (see scripts/antiuav/manual_dataloader.py for the
 index it reads), runs the model on one modality, post-processes the raw YOLO output
 with NMSYoloBoxes and saves the features to an npz under --output-dir. Details in
-thesis.extract_antiuav.extract_features.
+thesis.antiuav.extract.extract_features.
 
 Example:
-    python scripts/extract_antiuav_script.py --split train --modality rgb --batch-size 32
-    python scripts/extract_antiuav_script.py --modality thermal --weights model_weights/edtc_yolov5s.pt
+    python scripts/antiuav/extract_features.py --split train --modality rgb --batch-size 32
+    python scripts/antiuav/extract_features.py --modality thermal --weights model_weights/edtc_yolov5s.pt
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from pathlib import Path
 
 import torch
 
+from thesis.antiuav.extract import extract_features
+from thesis.antiuav.index import SPLITS
 from thesis.config import Config
-from thesis.extract_antiuav import extract_features
-from thesis.index_antiuav import SPLITS
 from thesis.paths import OUTPUT_DIR
 
 

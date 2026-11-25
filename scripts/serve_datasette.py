@@ -1,6 +1,9 @@
-"""Serve the Anti-UAV RGB-T index database in Datasette, with inline frame thumbnails.
+"""Serve a dataset's sqlite index (index.db) in Datasette, with inline frame thumbnails.
 
-Expects the sqlite index to exist already (build it with `uv run python scripts/index_antiuav_script.py`),
+Generic runner: it defaults to the Anti-UAV RGB-T index (see the configuration block
+below) and any other dataset's index can be served via --dataset-root / --db.
+Expects the sqlite index to exist already (for the default Anti-UAV index, build it
+with `uv run python scripts/antiuav/sqlite_index.py`),
 then runs:
 
     datasette serve --immutable <db> --static dataset:<dataset_root> -m <metadata>
@@ -97,7 +100,8 @@ def main() -> None:
     db_path = args.db.expanduser().resolve()
     if not db_path.exists():
         parser.error(
-            f"database missing: {db_path}; build the index first with `uv run python scripts/index_antiuav_script.py`"
+            f"database missing: {db_path}; build the index first (default Anti-UAV: "
+            "`uv run python scripts/antiuav/sqlite_index.py`)"
         )
 
     metadata_path = db_path.parent / METADATA_NAME

@@ -1,6 +1,6 @@
 """Generic pandas-backed torch Dataset with chainable views and transform swaps.
 
-Base class for the dataset-specific datasets (e.g. thesis.dataset_antiuav.AntiUAVFrames),
+Base class for the dataset-specific datasets (e.g. thesis.antiuav.dataset.AntiUAVFrames),
 so the view/transform machinery is written once and reused across datasets:
 
 - `view(mask=..., frac=..., seed=...)` returns a lightweight copy over a filtered df

@@ -4,11 +4,11 @@ Walks <dataset_root>/processed/<split>/<sequence>/<modality> and the per-split
 condition labels in <dataset_root>/label_new, then writes the frames_rgb,
 frames_thermal and sequences tables. Run the preprocessing first:
 
-    python scripts/preprocess_antiuav_script.py --step 10
+    python scripts/antiuav/preprocess.py --step 10
 
 Example:
-    python scripts/index_antiuav_script.py
-    python scripts/index_antiuav_script.py --splits train val
+    python scripts/antiuav/sqlite_index.py
+    python scripts/antiuav/sqlite_index.py --splits train val
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from thesis.index_antiuav import SPLITS, IndexConfig, index_dataset
+from thesis.antiuav.index import SPLITS, IndexConfig, index_dataset
 from thesis.paths import ANTI_UAV_DATA_DIR
 
 

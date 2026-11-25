@@ -1,6 +1,6 @@
 """Main PyTorch Dataset over the Anti-UAV RGB-T sqlite index.
 
-Joins the frames_rgb and frames_thermal tables written by thesis.index_antiuav
+Joins the frames_rgb and frames_thermal tables written by thesis.antiuav.index
 on (sequence, frame_id) (both modalities are cut up with the same parameters,
 so they align 1:1) and yields one sample per RGB-T frame pair:
 
@@ -14,7 +14,8 @@ so they align 1:1) and yields one sample per RGB-T frame pair:
 
 Samples are plain dicts, so the default collate of torch.utils.data.DataLoader
 batches them (tensors are stacked, strings become lists, ints become tensors).
-Build the loader at the call site, e.g. DataLoader(dataset, batch_size=32).
+Build the loader at the call site, e.g. DataLoader(dataset, batch_size=32); a shared
+make_dataloader(...) factory is planned for all new code (TODO.md item 1).
 The full index table stays available as dataset.df.
 
 Sub-dataset views: `view(conditions=..., how="any"|"all", drone_only=...,
@@ -37,7 +38,7 @@ import torch
 from PIL import Image
 from torchvision.transforms import v2
 
-from thesis.index_antiuav import SPLITS
+from thesis.antiuav.index import SPLITS
 from thesis.paths import ANTI_UAV_DATA_DIR, join
 from thesis.transforms import TRANSFORM_DEFAULT
 from thesis.utils.dataset import DataFrameDataset, SampleType
@@ -103,7 +104,7 @@ class AntiUAVFrames(DataFrameDataset):
         if not db_path.exists():
             raise FileNotFoundError(
                 f"Index database not found: {db_path}. "
-                'Build it first with "uv run python scripts/index_antiuav_script.py"'
+                'Build it first with "uv run python scripts/antiuav/sqlite_index.py"'
             )
         self.transform = transform
         self.thermal_transform = thermal_transform if thermal_transform is not None else transform

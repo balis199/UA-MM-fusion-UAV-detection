@@ -10,7 +10,7 @@ def _(mo):
     ### 1. Imports & dataset setup
     Imports all required libraries; `import marimo as mo` happens only in the code cell
     below and every other cell receives `mo` as a parameter. Resolves the `Anti-UAV-RGBT`
-    dataset path (works from both `notebooks/` and the repo root) and lists all train-split
+    dataset path (works from both `notebooks/antiuav/` and the repo root) and lists all train-split
     sequence names for the dropdown. Per-sequence calibration is explored on the train split;
     applying it to test sequences without leakage is an open assumption.
     """)

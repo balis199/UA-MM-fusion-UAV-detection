@@ -9,7 +9,7 @@ def _(mo):
     mo.md(r"""
     ### 1. Imports & dataset setup
     Loads all required libraries (cv2, numpy, matplotlib, sklearn, marimo), resolves the
-    `Anti-UAV-RGBT` dataset path (works from both `notebooks/` and repo root), and lists
+    `Anti-UAV-RGBT` dataset path (works from both `notebooks/antiuav/` and repo root), and lists
     all test-split sequence names for the dropdown selector.
     """)
     return

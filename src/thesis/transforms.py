@@ -7,7 +7,7 @@ This module is the sample for writing custom torchvision v2 transforms: subclass
 - `TRANSFORM_DEFAULT`: default image transform used by the datasets (ToImage ->
   Resize 224x224 -> float32 scaled).
 - `NMSYoloBoxes`: post-processes raw YOLO output ([B, N, 85]) into NMS-filtered boxes
-  prefixed with the batch index (used by `extract_antiuav.py`).
+  prefixed with the batch index (used by `antiuav/extract.py`).
 """
 
 from typing import Any
